@@ -1,0 +1,92 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { subjects } from "../data/curriculum";
+
+const STORAGE_KEY = "bsit_progress";
+
+// Load saved progress from device storage
+export async function getProgress() {
+  try {
+    const raw = await AsyncStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+// Save progress to device storage
+export async function saveProgress(progress) {
+  try {
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+  } catch (e) {
+    console.error("Failed to save progress", e);
+  }
+}
+
+// Get the computed status of a single subject
+export function getSubjectStatus(subjectKey, progress) {
+  // If student has manually set a status, use it
+  if (progress[subjectKey]) return progress[subjectKey];
+
+  const subject = subjects[subjectKey];
+  if (!subject) return "locked";
+
+  // Check if all prerequisites are passed
+  const allPrereqsPassed = subject.prerequisites.every(
+    (prereq) => progress[prereq] === "passed"
+  );
+
+  return allPrereqsPassed ? "available" : "locked";
+}
+
+// Compute statuses for ALL subjects at once
+export function computeAllStatuses(progress) {
+  const statuses = {};
+  for (const key of Object.keys(subjects)) {
+    statuses[key] = getSubjectStatus(key, progress);
+  }
+  return statuses;
+}
+
+// When a subject is marked failed, cascade-lock its dependents
+export function cascadeFailure(subjectKey, progress) {
+  const updated = { ...progress, [subjectKey]: "failed" };
+
+  function lockDependents(key) {
+    for (const [depKey, depSubject] of Object.entries(subjects)) {
+      if (depSubject.prerequisites.includes(key)) {
+        // Only lock if it was enrolled or available (don't touch passed ones
+        // unless they also lose their prereqs)
+        if (updated[depKey] === "enrolled" || updated[depKey] === "available") {
+          updated[depKey] = undefined; // revert to computed (locked)
+          lockDependents(depKey); // recurse
+        }
+      }
+    }
+  }
+
+  lockDependents(subjectKey);
+  return updated;
+}
+
+// Get a human-readable list of missing prerequisites for a subject
+export function getMissingPrereqs(subjectKey, progress) {
+  const subject = subjects[subjectKey];
+  if (!subject) return [];
+  return subject.prerequisites
+    .filter((prereq) => progress[prereq] !== "passed")
+    .map((prereq) => subjects[prereq]?.code ?? prereq);
+}
+
+// Summary stats
+export function getProgressSummary(progress) {
+  const allKeys = Object.keys(subjects);
+  const statuses = computeAllStatuses(progress);
+  return {
+    total: allKeys.length,
+    passed: allKeys.filter((k) => statuses[k] === "passed").length,
+    enrolled: allKeys.filter((k) => statuses[k] === "enrolled").length,
+    failed: allKeys.filter((k) => statuses[k] === "failed").length,
+    available: allKeys.filter((k) => statuses[k] === "available").length,
+    locked: allKeys.filter((k) => statuses[k] === "locked").length,
+  };
+}
