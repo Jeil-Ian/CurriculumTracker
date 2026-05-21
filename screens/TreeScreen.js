@@ -10,6 +10,7 @@ import {
 import Svg, { Line, Rect, Text as SvgText, Circle } from "react-native-svg";
 import { getProgress, computeAllStatuses } from "../utils/progressStore";
 import { subjects } from "../data/curriculum";
+import * as authService from "../src/services/auth";
 
 const STATUS_COLORS = {
   passed:    "#22c55e",
@@ -98,8 +99,15 @@ export default function TreeScreen({ navigation }) {
 
   useEffect(() => {
     (async () => {
-      const progress = await getProgress();
-      setStatuses(computeAllStatuses(progress));
+      try {
+        const user = await authService.getCurrentUser();
+        if (user) {
+          const progress = await getProgress(user.id);
+          setStatuses(computeAllStatuses(progress));
+        }
+      } catch (err) {
+        console.error("Error loading tree screen:", err);
+      }
     })();
   }, []);
 

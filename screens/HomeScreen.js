@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   StatusBar,
+  ActivityIndicator,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import {
@@ -14,6 +15,7 @@ import {
   getProgressSummary,
 } from "../utils/progressStore";
 import { getCurriculumByYearSem } from "../data/curriculum";
+import * as authService from "../src/services/auth";
 
 const STATUS_CONFIG = {
   passed:    { color: "#22c55e", label: "Passed",    emoji: "✅" },
@@ -26,17 +28,41 @@ const STATUS_CONFIG = {
 export default function HomeScreen({ navigation }) {
   const [statuses, setStatuses] = useState({});
   const [summary, setSummary] = useState({});
+  const [userId, setUserId] = useState(null);
+  const [loading, setLoading] = useState(true);
   const curriculum = getCurriculumByYearSem();
 
+  // Get current user on mount and when screen is focused
   useFocusEffect(
     useCallback(() => {
       (async () => {
-        const progress = await getProgress();
-        setStatuses(computeAllStatuses(progress));
-        setSummary(getProgressSummary(progress));
+        try {
+          setLoading(true);
+          const user = await authService.getCurrentUser();
+          
+          if (user) {
+            setUserId(user.id);
+            const progress = await getProgress(user.id);
+            setStatuses(computeAllStatuses(progress));
+            setSummary(getProgressSummary(progress));
+          }
+        } catch (err) {
+          console.error("Error loading home screen:", err);
+        } finally {
+          setLoading(false);
+        }
       })();
     }, [])
   );
+
+  const handleLogout = async () => {
+    try {
+      await authService.logout();
+      // Navigation to LoginScreen happens via App.js auth state change
+    } catch (err) {
+      console.error("Error logging out:", err);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -44,8 +70,18 @@ export default function HomeScreen({ navigation }) {
 
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>BSIT Tracker</Text>
-        <Text style={styles.headerSub}>USC — Effective 2023</Text>
+        <View style={styles.headerTop}>
+          <View>
+            <Text style={styles.headerTitle}>BSIT Tracker</Text>
+            <Text style={styles.headerSub}>USC — Effective 2023</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.logoutBtn}
+            onPress={handleLogout}
+          >
+            <Text style={styles.logoutBtnText}>🚪 Logout</Text>
+          </TouchableOpacity>
+        </View>
         <TouchableOpacity
           style={styles.treeBtn}
           onPress={() => navigation.navigate("Tree")}
@@ -54,37 +90,43 @@ export default function HomeScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      {/* Summary Bar */}
-      {summary.total > 0 && (
-        <View style={styles.summaryRow}>
-          {["passed", "enrolled", "failed", "available", "locked"].map((s) => (
-            <View key={s} style={styles.summaryItem}>
-              <Text style={[styles.summaryNum, { color: STATUS_CONFIG[s].color }]}>
-                {summary[s] ?? 0}
-              </Text>
-              <Text style={styles.summaryLabel}>{STATUS_CONFIG[s].label}</Text>
-            </View>
-          ))}
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#3b82f6" />
         </View>
-      )}
+      ) : (
+        <>
+          {/* Summary Bar */}
+          {summary.total > 0 && (
+            <View style={styles.summaryRow}>
+              {["passed", "enrolled", "failed", "available", "locked"].map((s) => (
+                <View key={s} style={styles.summaryItem}>
+                  <Text style={[styles.summaryNum, { color: STATUS_CONFIG[s].color }]}>
+                    {summary[s] ?? 0}
+                  </Text>
+                  <Text style={styles.summaryLabel}>{STATUS_CONFIG[s].label}</Text>
+                </View>
+              ))}
+            </View>
+          )}
 
-      {/* Progress Bar */}
-      <View style={styles.progressBarBg}>
-        <View
-          style={[
-            styles.progressBarFill,
-            {
-              width: `${summary.total ? (summary.passed / summary.total) * 100 : 0}%`,
-            },
-          ]}
-        />
-      </View>
-      <Text style={styles.progressText}>
-        {summary.passed ?? 0} / {summary.total ?? 0} subjects passed
-      </Text>
+          {/* Progress Bar */}
+          <View style={styles.progressBarBg}>
+            <View
+              style={[
+                styles.progressBarFill,
+                {
+                  width: `${summary.total ? (summary.passed / summary.total) * 100 : 0}%`,
+                },
+              ]}
+            />
+          </View>
+          <Text style={styles.progressText}>
+            {summary.passed ?? 0} / {summary.total ?? 0} subjects passed
+          </Text>
 
-      {/* Curriculum List */}
-      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
+          {/* Curriculum List */}
+          <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
         {curriculum.map((group) => (
           <View key={`Y${group.year}S${group.sem}`} style={styles.group}>
             <Text style={styles.groupLabel}>{group.label}</Text>
@@ -119,22 +161,31 @@ export default function HomeScreen({ navigation }) {
         ))}
         <View style={{ height: 40 }} />
       </ScrollView>
+        </>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#0f172a" },
+  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
   header: {
     backgroundColor: "#1e293b",
     paddingTop: 56,
     paddingHorizontal: 20,
     paddingBottom: 16,
   },
+  headerTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 12,
+  },
   headerTitle: { fontSize: 26, fontWeight: "800", color: "#f8fafc" },
   headerSub: { fontSize: 13, color: "#94a3b8", marginTop: 2 },
   treeBtn: {
-    marginTop: 12,
+    marginTop: 0,
     backgroundColor: "#3b82f6",
     borderRadius: 10,
     paddingVertical: 8,
@@ -142,6 +193,13 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
   },
   treeBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  logoutBtn: {
+    backgroundColor: "#ef4444",
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  logoutBtnText: { color: "#fff", fontWeight: "700", fontSize: 12 },
   summaryRow: {
     flexDirection: "row",
     justifyContent: "space-around",

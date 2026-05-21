@@ -9,13 +9,14 @@ import {
 } from "react-native";
 import {
   getProgress,
-  saveProgress,
+  saveSubjectStatus,
   computeAllStatuses,
   getMissingPrereqs,
   cascadeFailure,
   getSubjectStatus,
 } from "../utils/progressStore";
 import { subjects, getDependents } from "../data/curriculum";
+import * as authService from "../src/services/auth";
 
 const STATUS_CONFIG = {
   passed:    { color: "#22c55e", label: "Passed",    emoji: "✅" },
@@ -32,18 +33,29 @@ export default function SubjectDetailScreen({ route, navigation }) {
   const [progress, setProgress] = useState({});
   const [currentStatus, setCurrentStatus] = useState("locked");
   const [allStatuses, setAllStatuses] = useState({});
+  const [userId, setUserId] = useState(null);
 
   useEffect(() => {
     (async () => {
-      const p = await getProgress();
-      setProgress(p);
-      setAllStatuses(computeAllStatuses(p));
-      setCurrentStatus(getSubjectStatus(subjectKey, p));
+      try {
+        const user = await authService.getCurrentUser();
+        if (user) {
+          setUserId(user.id);
+          const p = await getProgress(user.id);
+          setProgress(p);
+          setAllStatuses(computeAllStatuses(p));
+          setCurrentStatus(getSubjectStatus(subjectKey, p));
+        }
+      } catch (err) {
+        console.error("Error loading subject detail:", err);
+      }
     })();
     navigation.setOptions({ title: subject?.code ?? "Subject" });
   }, [subjectKey]);
 
   const handleSetStatus = async (newStatus) => {
+    if (!userId) return;
+
     let updated = { ...progress };
 
     if (newStatus === "failed") {
@@ -57,7 +69,15 @@ export default function SubjectDetailScreen({ route, navigation }) {
             style: "destructive",
             onPress: async () => {
               updated = cascadeFailure(subjectKey, progress);
-              await saveProgress(updated);
+              // Save to Supabase
+              for (const [key, status] of Object.entries(updated)) {
+                await saveSubjectStatus(
+                  userId,
+                  subjects[key]?.code ?? "",
+                  subjects[key]?.name ?? "",
+                  status
+                );
+              }
               setProgress(updated);
               setAllStatuses(computeAllStatuses(updated));
               setCurrentStatus(getSubjectStatus(subjectKey, updated));
@@ -70,11 +90,22 @@ export default function SubjectDetailScreen({ route, navigation }) {
 
     if (newStatus === "clear") {
       delete updated[subjectKey];
+            await saveSubjectStatus(
+        userId,
+        subjectKey,
+        subject.name,
+        "available"
+      );
     } else {
       updated[subjectKey] = newStatus;
+      await saveSubjectStatus(
+        userId,
+        subjectKey,
+        subject.name,
+        newStatus
+      );
     }
 
-    await saveProgress(updated);
     setProgress(updated);
     setAllStatuses(computeAllStatuses(updated));
     setCurrentStatus(getSubjectStatus(subjectKey, updated));

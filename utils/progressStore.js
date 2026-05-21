@@ -1,24 +1,68 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { subjects } from "../data/curriculum";
+import * as supabaseService from "../src/services/supabase";
 
-const STORAGE_KEY = "bsit_progress";
-
-// Load saved progress from device storage
-export async function getProgress() {
+// Load saved progress from Supabase for a specific user
+export async function getProgress(userId) {
   try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
+    if (!userId) {
+      console.warn("getProgress called without userId");
+      return {};
+    }
+    const { progress, error } = await supabaseService.fetchUserProgress(userId);
+    if (error) {
+      console.error("Failed to fetch progress from Supabase:", error);
+      return {};
+    }
+    return progress;
+  } catch (e) {
+    console.error("Failed to load progress", e);
     return {};
   }
 }
 
-// Save progress to device storage
-export async function saveProgress(progress) {
+// Save progress to Supabase for a specific user
+// This now takes full progress object and upserts all changes
+export async function saveProgress(userId, progress) {
   try {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+    if (!userId) {
+      console.warn("saveProgress called without userId");
+      return;
+    }
+    // Only upsert the records that have explicit statuses (not computed ones)
+    const updates = {};
+    for (const [key, status] of Object.entries(progress)) {
+      if (status && status !== "locked") {
+        updates[key] = status;
+      }
+    }
+    if (Object.keys(updates).length > 0) {
+      await supabaseService.updateMultipleSubjectStatuses(userId, updates);
+    }
   } catch (e) {
     console.error("Failed to save progress", e);
+  }
+}
+
+// Save a single subject status to Supabase
+export async function saveSubjectStatus(userId, subjectKey, subjectName, status) {
+  try {
+    if (!userId) {
+      console.warn("saveSubjectStatus called without userId");
+      return; 
+    }
+    if (status === "locked") {
+      // Don't store "locked" status; delete the record to revert to computed
+      await supabaseService.deleteSubjectStatus(userId, subjectKey);
+    } else {
+      await supabaseService.updateSubjectStatus(
+      userId,
+      subjectKey,
+      subjectName,
+      status
+    );
+    }
+  } catch (e) {
+    console.error("Failed to save subject status", e);
   }
 }
 
