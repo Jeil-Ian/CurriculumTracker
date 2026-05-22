@@ -6,6 +6,7 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as authService from "../src/services/auth";
+import { Feather, Ionicons } from "@expo/vector-icons";
 
 export default function SignupScreen({ navigation }) {
   const [email, setEmail]                   = useState("");
