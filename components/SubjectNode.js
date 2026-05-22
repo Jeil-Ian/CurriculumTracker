@@ -1,5 +1,6 @@
 import React, { useRef, useEffect } from "react";
 import { Animated, TouchableOpacity, View, Text, StyleSheet } from "react-native";
+import {Feather} from "@expo/vector-icons";
 
 const STATUS_CONFIG = {
   passed:    { fill: "#064e3b", stroke: "#34d399", text: "#34d399", glow: "#34d39940" },

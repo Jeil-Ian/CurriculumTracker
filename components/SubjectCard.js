@@ -1,12 +1,7 @@
 import React, { useRef } from "react";
-import {
-  View,
-  Text,
-  Pressable,
-  StyleSheet,
-  Animated,
-} from "react-native";
+import { View, Text, Pressable, StyleSheet, Animated } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { Feather } from "@expo/vector-icons";
 
 const STATUS_CONFIG = {
   passed: {
@@ -14,7 +9,7 @@ const STATUS_CONFIG = {
     bg: "rgba(6,78,59,0.6)",
     border: "rgba(52,211,153,0.3)",
     label: "Passed",
-    icon: "✓",
+    icon: "check",
     glow: "rgba(52,211,153,0.12)",
   },
   enrolled: {
@@ -22,7 +17,7 @@ const STATUS_CONFIG = {
     bg: "rgba(30,58,95,0.6)",
     border: "rgba(96,165,250,0.3)",
     label: "Enrolled",
-    icon: "◉",
+    icon: "circle",
     glow: "rgba(96,165,250,0.12)",
   },
   failed: {
@@ -30,7 +25,7 @@ const STATUS_CONFIG = {
     bg: "rgba(76,29,29,0.6)",
     border: "rgba(248,113,113,0.3)",
     label: "Failed",
-    icon: "✗",
+    icon: "x",
     glow: "rgba(248,113,113,0.12)",
   },
   available: {
@@ -38,7 +33,7 @@ const STATUS_CONFIG = {
     bg: "rgba(69,26,3,0.6)",
     border: "rgba(251,191,36,0.3)",
     label: "Available",
-    icon: "◈",
+    icon: "disc",
     glow: "rgba(251,191,36,0.12)",
   },
   locked: {
@@ -46,7 +41,7 @@ const STATUS_CONFIG = {
     bg: "rgba(15,23,42,0.4)",
     border: "rgba(71,85,105,0.2)",
     label: "Locked",
-    icon: "◌",
+    icon: "lock",
     glow: "transparent",
   },
 };
@@ -75,7 +70,9 @@ export default function SubjectCard({ subject, status, onPress }) {
   };
 
   return (
-    <Animated.View style={[styles.wrapper, { transform: [{ scale: scaleAnim }] }]}>
+    <Animated.View
+      style={[styles.wrapper, { transform: [{ scale: scaleAnim }] }]}
+    >
       <Pressable
         onPress={onPress}
         onPressIn={handlePressIn}
@@ -119,12 +116,18 @@ export default function SubjectCard({ subject, status, onPress }) {
             <View
               style={[
                 styles.statusBadge,
-                { backgroundColor: `${cfg.color}22`, borderColor: `${cfg.color}44` },
+                {
+                  backgroundColor: `${cfg.color}22`,
+                  borderColor: `${cfg.color}44`,
+                },
               ]}
             >
-              <Text style={[styles.statusIcon, { color: cfg.color }]}>
-                {cfg.icon}
-              </Text>
+              <Feather
+                name={cfg.icon}
+                size={12}
+                color={cfg.color}
+                style={styles.statusIcon}
+              />
               <Text style={[styles.statusLabel, { color: cfg.color }]}>
                 {cfg.label}
               </Text>
@@ -135,12 +138,7 @@ export default function SubjectCard({ subject, status, onPress }) {
 
         {/* Glow overlay for active statuses */}
         {!isLocked && (
-          <View
-            style={[
-              styles.glowOverlay,
-              { backgroundColor: cfg.glow },
-            ]}
-          />
+          <View style={[styles.glowOverlay, { backgroundColor: cfg.glow }]} />
         )}
       </Pressable>
     </Animated.View>

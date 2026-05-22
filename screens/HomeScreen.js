@@ -204,12 +204,12 @@ export default function HomeScreen({ navigation }) {
     summary.total > 0 ? Math.round((summary.passed / summary.total) * 100) : 0;
 
   const motivationalMsg =
-    overallPct === 0   ? "Let's begin your journey 🚀"
-    : overallPct < 25  ? "Great start! Keep pushing 💪"
-    : overallPct < 50  ? "Halfway there, don't stop! ⚡"
-    : overallPct < 75  ? "More than halfway done! 🔥"
-    : overallPct < 100 ? "Almost there, you've got this! 🎯"
-    :                    "You crushed it! 🎓";
+    overallPct === 0   ? "Let's begin your journey "
+    : overallPct < 25  ? "Great start! Keep pushing "
+    : overallPct < 50  ? "Halfway there, don't stop! "
+    : overallPct < 75  ? "More than halfway done! "
+    : overallPct < 100 ? "Almost there, you've got this! "
+    :                    "You crushed it! ";
 
   const filteredCurriculum = filterStatus
     ? curriculum
@@ -269,7 +269,6 @@ export default function HomeScreen({ navigation }) {
                 activeOpacity={0.7}
               >
                 <Feather name="log-out" size={16} color="#ef4444" style={{ marginRight: 4 }} />
-                <Text style={styles.logoutBtnText}>Logout</Text>
               </TouchableOpacity>
             </View>
           </View>
