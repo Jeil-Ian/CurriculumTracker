@@ -1,18 +1,45 @@
 import { subjects } from "../data/curriculum";
 import * as supabaseService from "../src/services/supabase";
 
-// Load saved progress from Supabase for a specific user
+// ── Year standing thresholds (based on units passed) ──────────────────────
+const YEAR_STANDING = {
+  1: 0,
+  2: 50,
+  3: 121,
+};
+
+export function getUnitsPassed(progress) {
+  return Object.entries(progress)
+    .filter(([, status]) => status === "passed")
+    .reduce((total, [key]) => total + (subjects[key]?.units ?? 0), 0);
+}
+
+export function getTotalUnits() {
+  return Object.values(subjects).reduce((total, s) => total + (s.units ?? 0), 0);
+}
+
+export function getYearStanding(progress) {
+  const units = getUnitsPassed(progress);
+  if (units >= YEAR_STANDING[3]) return 3;
+  if (units >= YEAR_STANDING[2]) return 2;
+  return 1;
+}
+
+function isYearStandingReq(prereq) {
+  return typeof prereq === "string" && prereq.toUpperCase().includes("STANDING");
+}
+
+function getRequiredYear(prereqStr) {
+  if (prereqStr.includes("3")) return 3;
+  if (prereqStr.includes("2")) return 2;
+  return 1;
+}
+
 export async function getProgress(userId) {
   try {
-    if (!userId) {
-      console.warn("getProgress called without userId");
-      return {};
-    }
+    if (!userId) { console.warn("getProgress called without userId"); return {}; }
     const { progress, error } = await supabaseService.fetchUserProgress(userId);
-    if (error) {
-      console.error("Failed to fetch progress from Supabase:", error);
-      return {};
-    }
+    if (error) { console.error("Failed to fetch progress:", error); return {}; }
     return progress;
   } catch (e) {
     console.error("Failed to load progress", e);
@@ -20,20 +47,12 @@ export async function getProgress(userId) {
   }
 }
 
-// Save progress to Supabase for a specific user
-// This now takes full progress object and upserts all changes
 export async function saveProgress(userId, progress) {
   try {
-    if (!userId) {
-      console.warn("saveProgress called without userId");
-      return;
-    }
-    // Only upsert the records that have explicit statuses (not computed ones)
+    if (!userId) { console.warn("saveProgress called without userId"); return; }
     const updates = {};
     for (const [key, status] of Object.entries(progress)) {
-      if (status && status !== "locked") {
-        updates[key] = status;
-      }
+      if (status && status !== "locked") updates[key] = status;
     }
     if (Object.keys(updates).length > 0) {
       await supabaseService.updateMultipleSubjectStatuses(userId, updates);
@@ -43,46 +62,31 @@ export async function saveProgress(userId, progress) {
   }
 }
 
-// Save a single subject status to Supabase
 export async function saveSubjectStatus(userId, subjectKey, subjectName, status) {
   try {
-    if (!userId) {
-      console.warn("saveSubjectStatus called without userId");
-      return; 
-    }
+    if (!userId) { console.warn("saveSubjectStatus called without userId"); return; }
     if (status === "locked") {
-      // Don't store "locked" status; delete the record to revert to computed
       await supabaseService.deleteSubjectStatus(userId, subjectKey);
     } else {
-      await supabaseService.updateSubjectStatus(
-      userId,
-      subjectKey,
-      subjectName,
-      status
-    );
+      await supabaseService.updateSubjectStatus(userId, subjectKey, subjectName, status);
     }
   } catch (e) {
     console.error("Failed to save subject status", e);
   }
 }
 
-// Get the computed status of a single subject
 export function getSubjectStatus(subjectKey, progress) {
-  // If student has manually set a status, use it
   if (progress[subjectKey]) return progress[subjectKey];
-
   const subject = subjects[subjectKey];
   if (!subject) return "locked";
-
-  // Check if all prerequisites are passed
-  const allPrereqsPassed = subject.prerequisites.every(
-    (prereq) => progress[prereq] === "passed"
-  );
-
+  const yearStanding = getYearStanding(progress);
+  const allPrereqsPassed = subject.prerequisites.every((prereq) => {
+    if (isYearStandingReq(prereq)) return yearStanding >= getRequiredYear(prereq);
+    return progress[prereq] === "passed";
+  });
   return allPrereqsPassed ? "available" : "locked";
 }
 
-// Compute statuses for ALL subjects at once
 export function computeAllStatuses(progress) {
   const statuses = {};
   for (const key of Object.keys(subjects)) {
@@ -91,37 +95,43 @@ export function computeAllStatuses(progress) {
   return statuses;
 }
 
-// When a subject is marked failed, cascade-lock its dependents
 export function cascadeFailure(subjectKey, progress) {
   const updated = { ...progress, [subjectKey]: "failed" };
-
   function lockDependents(key) {
     for (const [depKey, depSubject] of Object.entries(subjects)) {
       if (depSubject.prerequisites.includes(key)) {
-        // Only lock if it was enrolled or available (don't touch passed ones
-        // unless they also lose their prereqs)
         if (updated[depKey] === "enrolled" || updated[depKey] === "available") {
-          updated[depKey] = undefined; // revert to computed (locked)
-          lockDependents(depKey); // recurse
+          updated[depKey] = undefined;
+          lockDependents(depKey);
         }
       }
     }
   }
-
   lockDependents(subjectKey);
   return updated;
 }
 
-// Get a human-readable list of missing prerequisites for a subject
+// Returns { code, name, isYearStanding } objects instead of just code strings
 export function getMissingPrereqs(subjectKey, progress) {
   const subject = subjects[subjectKey];
   if (!subject) return [];
+  const yearStanding = getYearStanding(progress);
   return subject.prerequisites
-    .filter((prereq) => progress[prereq] !== "passed")
-    .map((prereq) => subjects[prereq]?.code ?? prereq);
+    .filter((prereq) => {
+      if (isYearStandingReq(prereq)) return yearStanding < getRequiredYear(prereq);
+      return progress[prereq] !== "passed";
+    })
+    .map((prereq) => {
+      if (isYearStandingReq(prereq)) {
+        const requiredYear = getRequiredYear(prereq);
+        const needed = YEAR_STANDING[requiredYear];
+        const current = getUnitsPassed(progress);
+        return { code: prereq, name: `Need ${needed} units passed (you have ${current})`, isYearStanding: true };
+      }
+      return { code: subjects[prereq]?.code ?? prereq, name: subjects[prereq]?.name ?? "", isYearStanding: false };
+    });
 }
 
-// Summary stats
 export function getProgressSummary(progress) {
   const allKeys = Object.keys(subjects);
   const statuses = computeAllStatuses(progress);
@@ -132,5 +142,8 @@ export function getProgressSummary(progress) {
     failed: allKeys.filter((k) => statuses[k] === "failed").length,
     available: allKeys.filter((k) => statuses[k] === "available").length,
     locked: allKeys.filter((k) => statuses[k] === "locked").length,
+    unitsPassed: getUnitsPassed(progress),
+    totalUnits: getTotalUnits(),
+    yearStanding: getYearStanding(progress),
   };
 }

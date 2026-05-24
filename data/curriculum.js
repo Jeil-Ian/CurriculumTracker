@@ -207,7 +207,7 @@ export const subjects = {
     units: 3,
     year: 2,
     sem: 1,
-    prerequisites: ["CIS1201"],
+    prerequisites: ["CIS 1201"],
   },
   "CIS 2103": {
     code: "CIS 2103",
@@ -215,7 +215,7 @@ export const subjects = {
     units: 3,
     year: 2,
     sem: 1,
-    prerequisites: ["CIS1201"],
+    prerequisites: ["CIS 1201"],
   },
   "CIS 2105": {
     code: "CIS 2105",
@@ -223,7 +223,7 @@ export const subjects = {
     units: 3,
     year: 2,
     sem: 1,
-    prerequisites: ["CIS1205"],
+    prerequisites: ["CIS 1205"],
   },
   "GE-ETHICS":{
     code: "GE-ETHICS",
@@ -323,7 +323,7 @@ export const subjects = {
     units: 3,
     year: 2,
     sem: 2,
-    prerequisites: ["CIS2101", "CIS2104"],
+    prerequisites: ["CIS 2101", "CIS 2104"],
   },
   "IT ELEC": {
     code: "IT ELEC",
