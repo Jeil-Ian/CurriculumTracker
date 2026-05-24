@@ -16,14 +16,23 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
-      }
+        "backgroundColor": "#ffffff",
+        "foregroundImage": "./assets/adaptive-icon.png"
+      },
+      "package": "com.trinity123123.SubjectTracker"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "004c4a7b-4d19-4645-8ac2-28e34fb07716"
+      },
+      "supabaseUrl": "https://yqjvavhsglqjzqgkzjze.supabase.co",
+      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlxanZhdmhzZ2xqem9xZ2t6amplIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTY5ODQ4ODQyOSwiZXhwIjoxOTk0MDQ0NDI5fQ.7n8j8lHhLh7uKjN8a3e7n1vWb1iLh8gXoV4r3wM8A"
+    },
+    "plugins": [
+      "expo-font"
+    ]
   }
 }
